@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Siêu Thị ABC - Mua sắm trực tuyến tiện lợi với hàng ngàn sản phẩm chất lượng, giá tốt nhất. Giao hàng nhanh chóng, thanh toán an toàn." />
+    <meta name="keywords" content="siêu thị, mua sắm online, thực phẩm tươi sống, đồ uống, bánh kẹo, gia vị, đồ gia dụng, chăm sóc cá nhân, ecommerce, shopping" />
+    <meta name="author" content="Siêu Thị ABC" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sieuthiabc.vn/" />
+    <meta property="og:title" content="Siêu Thị ABC - Mua sắm trực tuyến" />
+    <meta property="og:description" content="Mua sắm online tiện lợi với hàng ngàn sản phẩm chất lượng, giá tốt nhất" />
+    <meta property="og:image" content="/og-image.jpg" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://sieuthiabc.vn/" />
+    <meta property="twitter:title" content="Siêu Thị ABC - Mua sắm trực tuyến" />
+    <meta property="twitter:description" content="Mua sắm online tiện lợi với hàng ngàn sản phẩm chất lượng, giá tốt nhất" />
+    <meta property="twitter:image" content="/og-image.jpg" />
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#1890ff" />
+    <meta name="msapplication-TileColor" content="#1890ff" />
+    
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    
+    <title>Siêu Thị ABC - Mua sắm tiện lợi</title>
+    
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      
+      /* Loading Screen */
+      #app-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease;
+      }
+      
+      #app-loading.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      
+      .loading-logo {
+        font-size: 80px;
+        margin-bottom: 30px;
+        animation: bounce 1.5s ease-in-out infinite;
+      }
+      
+      @keyframes bounce {
+        0%, 100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-20px);
+        }
+      }
+      
+      .loading-title {
+        color: white;
+        font-size: 36px;
+        font-weight: 800;
+        margin-bottom: 10px;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      }
+      
+      .loading-subtitle {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 18px;
+        font-weight: 400;
+        margin-bottom: 40px;
+      }
+      
+      /* Loading Spinner */
+      .loading-spinner {
+        width: 60px;
+        height: 60px;
+        position: relative;
+      }
+      
+      .loading-spinner::before,
+      .loading-spinner::after {
+        content: '';
+        position: absolute;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        animation: spin 1.5s linear infinite;
+      }
+      
+      .loading-spinner::before {
+        width: 60px;
+        height: 60px;
+        border-top-color: white;
+      }
+      
+      .loading-spinner::after {
+        width: 40px;
+        height: 40px;
+        top: 10px;
+        left: 10px;
+        border-top-color: white;
+        animation-duration: 1s;
+        animation-direction: reverse;
+      }
+      
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      
+      /* Decorative Shapes */
+      .loading-decoration {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      
+      .shape {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        animation: float 6s ease-in-out infinite;
+      }
+      
+      .shape-1 {
+        width: 300px;
+        height: 300px;
+        top: -100px;
+        left: -100px;
+        animation-delay: 0s;
+      }
+      
+      .shape-2 {
+        width: 200px;
+        height: 200px;
+        bottom: -50px;
+        right: -50px;
+        animation-delay: 2s;
+      }
+      
+      .shape-3 {
+        width: 150px;
+        height: 150px;
+        top: 50%;
+        right: 10%;
+        animation-delay: 4s;
+      }
+      
+      @keyframes float {
+        0%, 100% {
+          transform: translate(0, 0);
+        }
+        50% {
+          transform: translate(30px, 30px);
+        }
+      }
+      
+      /* Loading Progress */
+      .loading-progress {
+        margin-top: 30px;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 14px;
+        font-weight: 500;
+      }
+      
+      /* Responsive */
+      @media (max-width: 768px) {
+        .loading-logo {
+          font-size: 60px;
+        }
+        
+        .loading-title {
+          font-size: 28px;
+        }
+        
+        .loading-subtitle {
+          font-size: 16px;
+        }
+        
+        .loading-spinner {
+          width: 50px;
+          height: 50px;
+        }
+        
+        .loading-spinner::before {
+          width: 50px;
+          height: 50px;
+        }
+        
+        .loading-spinner::after {
+          width: 34px;
+          height: 34px;
+          top: 8px;
+          left: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Loading Screen -->
+    <div id="app-loading">
+      <div class="loading-decoration">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+      </div>
+      
+      <div class="loading-logo">🛒</div>
+      <h1 class="loading-title">Siêu Thị ABC</h1>
+      <p class="loading-subtitle">Mua sắm trực tuyến tiện lợi</p>
+      <div class="loading-spinner"></div>
+      <p class="loading-progress" id="loading-text">Đang tải ứng dụng...</p>
+    </div>
+    
+    <!-- React Root -->
+    <div id="root"></div>
+    
+    <script>
+      // Hide loading screen when React app is ready
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          const loadingScreen = document.getElementById('app-loading');
+          if (loadingScreen) {
+            loadingScreen.classList.add('hidden');
+            setTimeout(function() {
+              loadingScreen.style.display = 'none';
+            }, 500);
+          }
+        }, 1000); // Minimum display time
+      });
+      
+      // Update loading text
+      const loadingTexts = [
+        'Đang tải ứng dụng...',
+        'Chuẩn bị giao diện...',
+        'Kết nối dữ liệu...',
+        'Sắp hoàn tất...'
+      ];
+      
+      let textIndex = 0;
+      const loadingTextEl = document.getElementById('loading-text');
+      
+      setInterval(function() {
+        textIndex = (textIndex + 1) % loadingTexts.length;
+        if (loadingTextEl) {
+          loadingTextEl.textContent = loadingTexts[textIndex];
+        }
+      }, 1500);
+    </script>
+    
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

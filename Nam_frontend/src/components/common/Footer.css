@@ -1,0 +1,90 @@
+.app-footer {
+  background: #001529;
+  color: #fff;
+  padding: 40px 50px 20px;
+  margin-top: 50px;
+}
+
+.footer-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.app-footer h3 {
+  color: #fff;
+  font-size: 18px;
+  margin-bottom: 20px;
+  font-weight: bold;
+}
+
+.app-footer p {
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.6;
+}
+
+.social-links {
+  display: flex;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.social-links a {
+  color: #fff;
+  font-size: 24px;
+  transition: color 0.3s;
+}
+
+.social-links a:hover {
+  color: #1890ff;
+}
+
+.footer-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footer-links li {
+  margin-bottom: 12px;
+}
+
+.footer-links a {
+  color: rgba(255, 255, 255, 0.65);
+  transition: color 0.3s;
+}
+
+.footer-links a:hover {
+  color: #1890ff;
+}
+
+.footer-contact {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footer-contact li {
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 30px;
+  padding-top: 20px;
+  text-align: center;
+}
+
+.footer-bottom p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+@media (max-width: 768px) {
+  .app-footer {
+    padding: 30px 15px 15px;
+  }
+}

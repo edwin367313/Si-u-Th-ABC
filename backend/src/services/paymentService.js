@@ -1,4 +1,4 @@
-const Payment = require('../models/Payment');
+const Payment = require('../models/Minh_Payment');
 const Order = require('../models/Order');
 const { generatePaymentCode, sleep } = require('../utils/helpers');
 const MomoGateway = require('../payment-gateways/momoGateway');

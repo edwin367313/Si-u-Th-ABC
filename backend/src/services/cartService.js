@@ -1,4 +1,4 @@
-const Cart = require('../models/Cart');
+const Cart = require('../models/Minh_Cart');
 
 /**
  * Lấy giỏ hàng của user
@@ -20,7 +20,7 @@ const addToCart = async (userId, productId, quantity = 1) => {
  * Cập nhật số lượng sản phẩm trong giỏ
  */
 const updateCartItem = async (userId, productId, quantity) => {
-  await Cart.updateItem(userId, productId, quantity);
+  await Cart.updateItemQuantity(userId, productId, quantity);
   return getCart(userId);
 };
 

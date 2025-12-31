@@ -1,0 +1,15 @@
+.product-list {
+  width: 100%;
+}
+
+.empty-products {
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+  padding: 20px 0;
+}

@@ -1,0 +1,88 @@
+.app-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  padding: 0 50px;
+}
+
+.header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1400px;
+  margin: 0 auto;
+  height: 64px;
+}
+
+.logo h1 {
+  color: white;
+  margin: 0;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.header-search {
+  flex: 1;
+  max-width: 500px;
+  margin: 0 30px;
+}
+
+.search-btn {
+  width: 100%;
+  text-align: left;
+  background: white;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.cart-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  font-size: 16px;
+  transition: opacity 0.3s;
+}
+
+.cart-link:hover {
+  opacity: 0.8;
+}
+
+.cart-icon {
+  font-size: 24px;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: white;
+}
+
+.username {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 15px;
+  }
+
+  .header-search {
+    display: none;
+  }
+
+  .cart-text {
+    display: none;
+  }
+}

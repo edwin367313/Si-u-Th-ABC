@@ -13,7 +13,8 @@ const config = {
     trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE === 'true',
     enableArithAbort: true,
     connectTimeout: 30000,
-    requestTimeout: 30000
+    requestTimeout: 30000,
+    instanceName: process.env.DB_INSTANCE || undefined
   },
   pool: {
     max: 10,

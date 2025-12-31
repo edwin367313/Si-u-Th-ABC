@@ -7,10 +7,11 @@ class Order {
   static async create(userId, orderData) {
     try {
       const {
-        shipping_address,
-        shipping_phone,
-        payment_method,
-        voucher_code,
+        shippingName,
+        shippingAddress,
+        shippingPhone,
+        paymentMethod,
+        voucherCode,
         note
       } = orderData;
       
@@ -21,22 +22,26 @@ class Order {
       
       try {
         // Get cart items
-        const cart = await pool.request()
+        const cartResult = await pool.request()
           .input('userId', sql.Int, userId)
           .query('SELECT id FROM Carts WHERE user_id = @userId');
         
-        if (!cart[0]) {
+        if (!cartResult.recordset[0]) {
           throw new Error('Cart not found');
         }
         
-        const cartItems = await pool.request()
-          .input('cartId', sql.Int, cart[0].id)
+        const cartId = cartResult.recordset[0].id;
+        
+        const cartItemsResult = await pool.request()
+          .input('cartId', sql.Int, cartId)
           .query(`
-            SELECT ci.*, p.price, p.discount_percent, p.name, p.stock_quantity
+            SELECT ci.*, p.price, p.discount_percent, p.name, p.stock as stock_quantity
             FROM CartItems ci
             INNER JOIN Products p ON ci.product_id = p.id
-            WHERE ci.cart_id = @cartId AND p.is_active = 1
+            WHERE ci.cart_id = @cartId AND p.status = 'active'
           `);
+        
+        const cartItems = cartItemsResult.recordset;
         
         if (cartItems.length === 0) {
           throw new Error('Cart is empty');
@@ -45,92 +50,96 @@ class Order {
         // Calculate total
         let total = 0;
         for (const item of cartItems) {
-          const discountedPrice = item.price * (100 - item.discount_percent) / 100;
-          total += discountedPrice * item.quantity;
-          
           // Check stock
           if (item.stock_quantity < item.quantity) {
-            throw new Error(`Insufficient stock for ${item.name}`);
+            throw new Error(`Sản phẩm ${item.name} không đủ hàng`);
           }
+          
+          const discountedPrice = item.price * (100 - (item.discount_percent || 0)) / 100;
+          total += discountedPrice * item.quantity;
         }
         
         // Apply voucher if provided
         let discount_amount = 0;
         let voucher_id = null;
-        if (voucher_code) {
-          const voucher = await pool.request()
-            .input('code', sql.NVarChar, voucher_code)
+        if (voucherCode) {
+          const voucherResult = await pool.request()
+            .input('code', sql.NVarChar, voucherCode)
             .query(`
               SELECT * FROM Vouchers 
               WHERE code = @code 
-              AND is_active = 1 
-              AND valid_from <= GETDATE() 
-              AND valid_to >= GETDATE()
-              AND usage_count < max_usage
+              AND status = 'active' 
+              AND start_date <= GETDATE() 
+              AND end_date >= GETDATE()
+              AND (usage_limit IS NULL OR usage_limit > 0)
             `);
           
-          if (voucher[0]) {
-            voucher_id = voucher[0].id;
-            discount_amount = total * voucher[0].discount_percent / 100;
-            
-            if (voucher[0].max_discount_amount && discount_amount > voucher[0].max_discount_amount) {
-              discount_amount = voucher[0].max_discount_amount;
+          const voucher = voucherResult.recordset[0];
+          
+          if (voucher) {
+            voucher_id = voucher.id;
+            if (voucher.discount_type === 'percent') {
+                discount_amount = total * voucher.discount_value / 100;
+            } else {
+                discount_amount = voucher.discount_value;
             }
             
-            // Update voucher usage
-            await pool.request()
-              .input('voucherId', sql.Int, voucher_id)
-              .query('UPDATE Vouchers SET usage_count = usage_count + 1 WHERE id = @voucherId');
+            if (voucher.max_discount_amount && discount_amount > voucher.max_discount_amount) {
+              discount_amount = voucher.max_discount_amount;
+            }
+            
+            if (voucher.usage_limit) {
+                 await pool.request()
+                  .input('voucherId', sql.Int, voucher_id)
+                  .query('UPDATE Vouchers SET usage_limit = usage_limit - 1 WHERE id = @voucherId');
+            }
           }
         }
         
         const final_total = total - discount_amount;
         
         // Create order
-        const order = await pool.request()
+        const orderResult = await pool.request()
           .input('userId', sql.Int, userId)
-          .input('total', sql.Decimal(10, 2), total)
-          .input('discount', sql.Decimal(10, 2), discount_amount)
-          .input('final_total', sql.Decimal(10, 2), final_total)
-          .input('shipping_address', sql.NVarChar, shipping_address)
-          .input('shipping_phone', sql.NVarChar, shipping_phone)
-          .input('payment_method', sql.NVarChar, payment_method)
-          .input('voucher_id', sql.Int, voucher_id)
+          .input('fullName', sql.NVarChar, shippingName)
+          .input('phone', sql.NVarChar, shippingPhone)
+          .input('address', sql.NVarChar, shippingAddress)
+          .input('totalAmount', sql.Decimal(18, 2), final_total)
+          .input('status', sql.NVarChar, 'pending')
+          .input('paymentMethod', sql.NVarChar, paymentMethod)
           .input('note', sql.NVarChar, note)
-          .input('status', sql.NVarChar, 'PENDING')
           .query(`
-            INSERT INTO Orders (user_id, total_amount, discount_amount, final_amount, shipping_address, shipping_phone, payment_method, voucher_id, note, status)
+            INSERT INTO Orders (user_id, full_name, phone, address, total_amount, status, payment_method, note)
             OUTPUT INSERTED.*
-            VALUES (@userId, @total, @discount, @final_total, @shipping_address, @shipping_phone, @payment_method, @voucher_id, @note, @status)
+            VALUES (@userId, @fullName, @phone, @address, @totalAmount, @status, @paymentMethod, @note)
           `);
         
-        const orderId = order[0].id;
+        const orderId = orderResult.recordset[0].id;
         
         // Create order items and update stock
         for (const item of cartItems) {
-          const discountedPrice = item.price * (100 - item.discount_percent) / 100;
+          const discountedPrice = item.price * (100 - (item.discount_percent || 0)) / 100;
           
           await pool.request()
             .input('orderId', sql.Int, orderId)
             .input('productId', sql.Int, item.product_id)
             .input('quantity', sql.Int, item.quantity)
-            .input('price', sql.Decimal(10, 2), discountedPrice)
-            .input('subtotal', sql.Decimal(10, 2), discountedPrice * item.quantity)
+            .input('price', sql.Decimal(18, 2), discountedPrice)
             .query(`
-              INSERT INTO OrderItems (order_id, product_id, quantity, price, subtotal)
-              VALUES (@orderId, @productId, @quantity, @price, @subtotal)
+              INSERT INTO OrderItems (order_id, product_id, quantity, price)
+              VALUES (@orderId, @productId, @quantity, @price)
             `);
           
           // Update product stock
           await pool.request()
             .input('productId', sql.Int, item.product_id)
             .input('quantity', sql.Int, item.quantity)
-            .query('UPDATE Products SET stock_quantity = stock_quantity - @quantity WHERE id = @productId');
+            .query('UPDATE Products SET stock = stock - @quantity WHERE id = @productId');
         }
         
         // Clear cart
         await pool.request()
-          .input('cartId', sql.Int, cart[0].id)
+          .input('cartId', sql.Int, cartId)
           .query('DELETE FROM CartItems WHERE cart_id = @cartId');
         
         await transaction.commit();
@@ -138,9 +147,11 @@ class Order {
         return await this.findById(orderId);
       } catch (error) {
         await transaction.rollback();
+        console.error("Transaction Error in Order.create:", error);
         throw error;
       }
     } catch (error) {
+      console.error("Order.create Top Level Error:", error);
       throw new Error(`Error creating order: ${error.message}`);
     }
   }
@@ -152,26 +163,26 @@ class Order {
     try {
       const pool = await require('../config/database').getPool();
       
-      const order = await pool.request()
+      const orderResult = await pool.request()
         .input('orderId', sql.Int, orderId)
         .query('SELECT * FROM Orders WHERE id = @orderId');
       
-      if (!order[0]) {
+      if (!orderResult.recordset[0]) {
         return null;
       }
       
-      const items = await pool.request()
+      const itemsResult = await pool.request()
         .input('orderId', sql.Int, orderId)
         .query(`
-          SELECT oi.*, p.name, p.image_url
+          SELECT oi.*, p.name, p.images
           FROM OrderItems oi
           INNER JOIN Products p ON oi.product_id = p.id
           WHERE oi.order_id = @orderId
         `);
       
       return {
-        ...order[0],
-        items: items
+        ...orderResult.recordset[0],
+        items: itemsResult.recordset
       };
     } catch (error) {
       throw new Error(`Error finding order: ${error.message}`);
@@ -186,7 +197,7 @@ class Order {
       const offset = (page - 1) * limit;
       const pool = await require('../config/database').getPool();
       
-      const orders = await pool.request()
+      const ordersResult = await pool.request()
         .input('userId', sql.Int, userId)
         .input('limit', sql.Int, limit)
         .input('offset', sql.Int, offset)
@@ -202,10 +213,10 @@ class Order {
         .query('SELECT COUNT(*) as total FROM Orders WHERE user_id = @userId');
       
       return {
-        orders: orders,
-        total: countResult[0].total,
+        orders: ordersResult.recordset,
+        total: countResult.recordset[0].total,
         page,
-        totalPages: Math.ceil(countResult[0].total / limit)
+        totalPages: Math.ceil(countResult.recordset[0].total / limit)
       };
     } catch (error) {
       throw new Error(`Error getting user orders: ${error.message}`);
@@ -229,7 +240,7 @@ class Order {
           WHERE id = @orderId
         `);
       
-      return result[0];
+      return result.recordset[0];
     } catch (error) {
       throw new Error(`Error updating order status: ${error.message}`);
     }
@@ -256,7 +267,7 @@ class Order {
       
       query += ' ORDER BY o.created_at DESC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
       
-      const orders = await request.query(query);
+      const ordersResult = await request.query(query);
       
       let countQuery = 'SELECT COUNT(*) as total FROM Orders WHERE 1=1';
       const countRequest = pool.request();
@@ -269,10 +280,10 @@ class Order {
       const countResult = await countRequest.query(countQuery);
       
       return {
-        orders: orders,
-        total: countResult[0].total,
+        orders: ordersResult.recordset,
+        total: countResult.recordset[0].total,
         page,
-        totalPages: Math.ceil(countResult[0].total / limit)
+        totalPages: Math.ceil(countResult.recordset[0].total / limit)
       };
     } catch (error) {
       throw new Error(`Error getting orders: ${error.message}`);

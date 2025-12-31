@@ -1,0 +1,36 @@
+# FastAPI và Web Server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-dotenv==1.0.0
+pydantic==2.5.3
+python-multipart==0.0.6
+
+# Machine Learning Core
+scikit-learn==1.4.0
+numpy==1.26.3
+pandas==2.2.0
+joblib==1.3.2
+
+# Apriori Algorithm
+mlxtend==0.23.0
+
+# NLP
+nltk==3.8.1
+# spacy==3.7.2  # Optional, uncomment if needed
+
+# Image Processing
+Pillow==10.2.0
+# tensorflow==2.15.0  # Optional, for real CNN training
+# torch==2.1.2  # Optional, alternative to TensorFlow
+
+# Database
+pymssql==2.2.11
+# pyodbc==5.0.1  # Alternative SQL Server driver
+
+# HTTP Client
+requests==2.31.0
+
+# Development
+pytest==7.4.4
+black==24.1.1
+flake8==7.0.0

@@ -2,30 +2,32 @@ const express = require('express');
 const router = express.Router();
 
 // Import all route modules
-const authRoutes = require('./authRoutes');
+const authRoutes = require('./Khanh_authRoutes');
 const productRoutes = require('./productRoutes');
-// const categoryRoutes = require('./categoryRoutes');
-const cartRoutes = require('./cartRoutes');
+const categoryRoutes = require('./categoryRoutes');
+const cartRoutes = require('./Minh_cartRoutes');
 const orderRoutes = require('./orderRoutes');
-const paymentRoutes = require('./paymentRoutes');
+const paymentRoutes = require('./Minh_paymentRoutes');
 const voucherRoutes = require('./voucherRoutes');
-const themeRoutes = require('./themeRoutes');
-// const revenueRoutes = require('./revenueRoutes');
+const themeRoutes = require('./Nghi_themeRoutes');
+const revenueRoutes = require('./Nghi_revenueRoutes');
 const uploadRoutes = require('./uploadRoutes');
-const analyticsRoutes = require('./analytics');
+const analyticsRoutes = require('./Hung_analytics');
+const notificationRoutes = require('./notificationRoutes');
 
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/products', productRoutes);
-// router.use('/categories', categoryRoutes);
+router.use('/categories', categoryRoutes);
 router.use('/cart', cartRoutes);
 router.use('/orders', orderRoutes);
 router.use('/payment', paymentRoutes);
 router.use('/vouchers', voucherRoutes);
 router.use('/themes', themeRoutes);
-// router.use('/revenue', revenueRoutes);
+router.use('/revenue', revenueRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/notifications', notificationRoutes);
 
 // API info route
 router.get('/', (req, res) => {

@@ -1,0 +1,10 @@
+.payment-api-config h3 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.payment-api-config h3:first-of-type {
+  margin-top: 0;
+}

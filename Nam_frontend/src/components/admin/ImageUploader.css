@@ -1,0 +1,13 @@
+.image-uploader {
+  padding: 20px 0;
+}
+
+.ant-upload-select-picture-card {
+  width: 120px;
+  height: 120px;
+}
+
+.ant-upload-list-picture-card-container {
+  width: 120px;
+  height: 120px;
+}

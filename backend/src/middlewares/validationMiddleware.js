@@ -140,7 +140,7 @@ const createOrderSchema = Joi.object({
       'array.min': 'Đơn hàng phải có ít nhất 1 sản phẩm',
       'any.required': 'Danh sách sản phẩm là bắt buộc'
     }),
-  shippingAddress: Joi.string().min(10).max(500).required()
+  shippingAddress: Joi.string().min(5).max(500).required()
     .messages({
       'any.required': 'Địa chỉ giao hàng là bắt buộc'
     }),
