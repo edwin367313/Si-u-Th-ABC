@@ -15,14 +15,21 @@ class Order {
         note
       } = orderData;
       
+      // Validate required fields
+      if (!userId) throw new Error('User ID is missing');
+      if (!shippingName) throw new Error('Shipping Name is missing');
+      if (!shippingPhone) throw new Error('Shipping Phone is missing');
+      if (!shippingAddress) throw new Error('Shipping Address is missing');
+
       const pool = await require('../config/database').getPool();
-      const transaction = pool.transaction();
+      const transaction = new sql.Transaction(pool);
       
       await transaction.begin();
       
       try {
         // Get cart items
-        const cartResult = await pool.request()
+        let request = new sql.Request(transaction);
+        const cartResult = await request
           .input('userId', sql.Int, userId)
           .query('SELECT id FROM Carts WHERE user_id = @userId');
         
@@ -32,10 +39,11 @@ class Order {
         
         const cartId = cartResult.recordset[0].id;
         
-        const cartItemsResult = await pool.request()
+        request = new sql.Request(transaction);
+        const cartItemsResult = await request
           .input('cartId', sql.Int, cartId)
           .query(`
-            SELECT ci.*, p.price, p.discount_percent, p.name, p.stock as stock_quantity
+            SELECT ci.product_id, ci.quantity, p.price as product_price, p.discount_percent, p.name, p.stock as stock_quantity
             FROM CartItems ci
             INNER JOIN Products p ON ci.product_id = p.id
             WHERE ci.cart_id = @cartId AND p.status = 'active'
@@ -44,26 +52,38 @@ class Order {
         const cartItems = cartItemsResult.recordset;
         
         if (cartItems.length === 0) {
+          console.error(`[Order.create] Cart is empty for userId: ${userId}, cartId: ${cartId}`);
           throw new Error('Cart is empty');
         }
         
         // Calculate total
         let total = 0;
+        console.log('Cart Items:', JSON.stringify(cartItems));
         for (const item of cartItems) {
           // Check stock
           if (item.stock_quantity < item.quantity) {
             throw new Error(`Sản phẩm ${item.name} không đủ hàng`);
           }
           
-          const discountedPrice = item.price * (100 - (item.discount_percent || 0)) / 100;
-          total += discountedPrice * item.quantity;
+          const price = Number(item.product_price);
+          const discountPercent = Number(item.discount_percent) || 0;
+          const quantity = Number(item.quantity);
+
+          if (isNaN(price)) throw new Error(`Invalid price for product ${item.product_id}: ${item.product_price}`);
+          if (isNaN(quantity)) throw new Error(`Invalid quantity for product ${item.product_id}`);
+
+          const discountedPrice = price * (100 - discountPercent) / 100;
+          total += discountedPrice * quantity;
         }
         
+        console.log('Calculated Total:', total);
+
         // Apply voucher if provided
         let discount_amount = 0;
         let voucher_id = null;
         if (voucherCode) {
-          const voucherResult = await pool.request()
+          request = new sql.Request(transaction);
+          const voucherResult = await request
             .input('code', sql.NVarChar, voucherCode)
             .query(`
               SELECT * FROM Vouchers 
@@ -78,18 +98,22 @@ class Order {
           
           if (voucher) {
             voucher_id = voucher.id;
+            const discountValue = Number(voucher.discount_value) || 0;
+            
             if (voucher.discount_type === 'percent') {
-                discount_amount = total * voucher.discount_value / 100;
+                discount_amount = total * discountValue / 100;
             } else {
-                discount_amount = voucher.discount_value;
+                discount_amount = discountValue;
             }
             
-            if (voucher.max_discount_amount && discount_amount > voucher.max_discount_amount) {
-              discount_amount = voucher.max_discount_amount;
+            const maxDiscount = Number(voucher.max_discount_amount) || 0;
+            if (maxDiscount > 0 && discount_amount > maxDiscount) {
+              discount_amount = maxDiscount;
             }
             
             if (voucher.usage_limit) {
-                 await pool.request()
+                 request = new sql.Request(transaction);
+                 await request
                   .input('voucherId', sql.Int, voucher_id)
                   .query('UPDATE Vouchers SET usage_limit = usage_limit - 1 WHERE id = @voucherId');
             }
@@ -98,16 +122,24 @@ class Order {
         
         const final_total = total - discount_amount;
         
+        console.log('Final Total Check:', { total, discount_amount, final_total });
+
+        // Ensure final_total is a valid number
+        const safe_total = isNaN(final_total) ? 0 : Math.max(0, final_total);
+
+        if (isNaN(safe_total)) throw new Error(`Total Amount is invalid: ${final_total} (Total: ${total}, Discount: ${discount_amount})`);
+
         // Create order
-        const orderResult = await pool.request()
+        request = new sql.Request(transaction);
+        const orderResult = await request
           .input('userId', sql.Int, userId)
-          .input('fullName', sql.NVarChar, shippingName)
-          .input('phone', sql.NVarChar, shippingPhone)
-          .input('address', sql.NVarChar, shippingAddress)
-          .input('totalAmount', sql.Decimal(18, 2), final_total)
-          .input('status', sql.NVarChar, 'pending')
-          .input('paymentMethod', sql.NVarChar, paymentMethod)
-          .input('note', sql.NVarChar, note)
+          .input('fullName', sql.NVarChar(100), shippingName)
+          .input('phone', sql.NVarChar(20), shippingPhone)
+          .input('address', sql.NVarChar(255), shippingAddress)
+          .input('totalAmount', sql.Decimal(18, 2), safe_total)
+          .input('status', sql.NVarChar(20), 'pending')
+          .input('paymentMethod', sql.NVarChar(50), paymentMethod || 'COD')
+          .input('note', sql.NVarChar(500), note || '')
           .query(`
             INSERT INTO Orders (user_id, full_name, phone, address, total_amount, status, payment_method, note)
             OUTPUT INSERTED.*
@@ -118,27 +150,39 @@ class Order {
         
         // Create order items and update stock
         for (const item of cartItems) {
-          const discountedPrice = item.price * (100 - (item.discount_percent || 0)) / 100;
+          const price = Number(item.product_price);
+          let discountedPrice = price * (100 - (item.discount_percent || 0)) / 100;
           
-          await pool.request()
+          // Ensure discountedPrice is a valid number
+          if (isNaN(discountedPrice) || discountedPrice === null || discountedPrice === undefined) {
+             discountedPrice = 0;
+          }
+          
+          const totalPrice = discountedPrice * item.quantity;
+
+          request = new sql.Request(transaction);
+          await request
             .input('orderId', sql.Int, orderId)
             .input('productId', sql.Int, item.product_id)
             .input('quantity', sql.Int, item.quantity)
             .input('price', sql.Decimal(18, 2), discountedPrice)
+            .input('totalPrice', sql.Decimal(18, 2), totalPrice)
             .query(`
-              INSERT INTO OrderItems (order_id, product_id, quantity, price)
-              VALUES (@orderId, @productId, @quantity, @price)
+              INSERT INTO OrderItems (order_id, product_id, quantity, price, total_price)
+              VALUES (@orderId, @productId, @quantity, @price, @totalPrice)
             `);
           
           // Update product stock
-          await pool.request()
+          request = new sql.Request(transaction);
+          await request
             .input('productId', sql.Int, item.product_id)
             .input('quantity', sql.Int, item.quantity)
             .query('UPDATE Products SET stock = stock - @quantity WHERE id = @productId');
         }
         
         // Clear cart
-        await pool.request()
+        request = new sql.Request(transaction);
+        await request
           .input('cartId', sql.Int, cartId)
           .query('DELETE FROM CartItems WHERE cart_id = @cartId');
         
@@ -236,8 +280,9 @@ class Order {
         .query(`
           UPDATE Orders 
           SET status = @status, updated_at = GETDATE()
-          OUTPUT INSERTED.*
-          WHERE id = @orderId
+          WHERE id = @orderId;
+          
+          SELECT * FROM Orders WHERE id = @orderId;
         `);
       
       return result.recordset[0];
@@ -255,7 +300,7 @@ class Order {
       const offset = (page - 1) * limit;
       const pool = await require('../config/database').getPool();
       
-      let query = 'SELECT o.*, u.username, u.email FROM Orders o INNER JOIN Users u ON o.user_id = u.id WHERE 1=1';
+      let query = 'SELECT o.*, u.username, u.email FROM Orders o LEFT JOIN Users u ON o.user_id = u.id WHERE 1=1';
       const request = pool.request()
         .input('limit', sql.Int, limit)
         .input('offset', sql.Int, offset);

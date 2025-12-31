@@ -58,7 +58,7 @@ const getProducts = async (filters = {}) => {
 
   // Get products
   const productsResult = await query(`
-    SELECT p.*, c.name as category_name
+    SELECT p.*, p.images as image_url, c.name as category_name
     FROM Products p
     LEFT JOIN Categories c ON p.category_id = c.id
     ${whereClause}
@@ -87,7 +87,7 @@ const getProducts = async (filters = {}) => {
  */
 const getProductById = async (productId) => {
   const result = await query(`
-    SELECT p.*, c.name as category_name
+    SELECT p.*, p.images as image_url, c.name as category_name
     FROM Products p
     LEFT JOIN Categories c ON p.category_id = c.id
     WHERE p.id = @productId

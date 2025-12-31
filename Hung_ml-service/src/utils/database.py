@@ -5,7 +5,7 @@ Database connection utilities for SQL Server
 import pymssql
 import os
 from contextlib import contextmanager
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 class Database:
     """SQL Server database connection manager"""
@@ -22,7 +22,7 @@ class Database:
         """Get database connection with context manager"""
         conn = None
         try:
-            conn = pymssql.connect(
+            conn = pymssql.connect(  # type: ignore
                 server=self.host,
                 port=self.port,
                 database=self.database,
@@ -38,7 +38,7 @@ class Database:
             if conn:
                 conn.close()
     
-    def execute_query(self, query: str, params: tuple = None) -> List[Dict[str, Any]]:
+    def execute_query(self, query: str, params: Optional[tuple] = None) -> List[Dict[str, Any]]:
         """Execute SELECT query and return results"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -46,7 +46,7 @@ class Database:
             results = cursor.fetchall()
             return results
     
-    def execute_non_query(self, query: str, params: tuple = None) -> int:
+    def execute_non_query(self, query: str, params: Optional[tuple] = None) -> int:
         """Execute INSERT/UPDATE/DELETE query"""
         with self.get_connection() as conn:
             cursor = conn.cursor()

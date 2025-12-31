@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, Menu, Badge, Dropdown, Avatar, Button } from 'antd';
+import { Layout, Menu, Badge, Dropdown, Avatar, Button, Input } from 'antd';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ShoppingCartOutlined,
@@ -14,11 +14,18 @@ import { useCart } from '../../context/CartContext';
 import './Header.css';
 
 const { Header: AntHeader } = Layout;
+const { Search } = Input;
 
 const Header = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user, logout, isAdmin } = useAuth();
   const { cart } = useCart();
+
+  const onSearch = (value) => {
+    if (value.trim()) {
+      navigate(`/products?search=${encodeURIComponent(value.trim())}`);
+    }
+  };
 
   const userMenuItems = [
     {
@@ -49,13 +56,13 @@ const Header = () => {
         </Link>
 
         <div className="header-search">
-          <Button
-            icon={<SearchOutlined />}
-            onClick={() => navigate('/search')}
-            className="search-btn"
-          >
-            Tìm kiếm sản phẩm...
-          </Button>
+          <Search
+            placeholder="Tìm kiếm sản phẩm..."
+            allowClear
+            onSearch={onSearch}
+            style={{ width: 400 }}
+            className="search-input"
+          />
         </div>
 
         <div className="header-actions">

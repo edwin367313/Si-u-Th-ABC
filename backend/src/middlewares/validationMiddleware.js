@@ -152,7 +152,7 @@ const createOrderSchema = Joi.object({
     .messages({
       'any.required': 'Tên người nhận là bắt buộc'
     }),
-  paymentMethod: Joi.string().valid('cod', 'momo', 'zalopay', 'paypal').required()
+  paymentMethod: Joi.string().valid('cod', 'momo', 'zalopay', 'paypal', 'bank_transfer').required()
     .messages({
       'any.required': 'Phương thức thanh toán là bắt buộc'
     }),

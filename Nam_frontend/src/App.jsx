@@ -27,6 +27,7 @@ const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminAnalytics = lazy(() => import('./pages/admin/Analytics'));
 const AdminProducts = lazy(() => import('./pages/admin/ProductsPage'));
+const AdminProductForm = lazy(() => import('./pages/admin/ProductFormPage'));
 const AdminOrders = lazy(() => import('./pages/admin/OrdersPage'));
 const AdminRevenue = lazy(() => import('./pages/admin/RevenuePage'));
 const AdminThemes = lazy(() => import('./pages/admin/ThemesPage'));
@@ -167,6 +168,22 @@ function AppContent() {
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminProducts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/products/new"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminProductForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/products/edit/:id"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminProductForm />
                 </ProtectedRoute>
               }
             />

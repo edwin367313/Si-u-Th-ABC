@@ -80,7 +80,7 @@ export const useProducts = (initialFilters = {}) => {
  */
 export const useProduct = (productId) => {
   const {
-    data: product,
+    data: productData,
     isLoading,
     error,
     refetch
@@ -91,6 +91,8 @@ export const useProduct = (productId) => {
       enabled: !!productId
     }
   );
+
+  const product = productData?.data?.product || productData?.product || null;
 
   return {
     product,

@@ -249,7 +249,7 @@ export const getOrderStatusText = (status) => {
     PROCESSING: 'Đang xử lý',
     CONFIRMED: 'Đã xác nhận',
     SHIPPING: 'Đang giao hàng',
-    DELIVERED: 'Đã giao hàng',
+    DELIVERED: 'Đã hoàn thành',
     CANCELLED: 'Đã hủy',
     REFUNDED: 'Đã hoàn tiền'
   };

@@ -31,20 +31,25 @@ const ProductCard = ({ product }) => {
       className="product-card"
       cover={
         <div className="product-image-wrapper" onClick={handleViewDetail}>
-          <img
-            alt={product.name}
-            src={product.image_url || '/placeholder.png'}
-            className="product-image"
-          />
+          <div className="product-image-placeholder" style={{ 
+              width: '100%', 
+              height: '200px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              backgroundColor: '#f0f0f0',
+              color: '#333',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              padding: '10px',
+              textAlign: 'center'
+            }}>
+              <span>{product.name}</span>
+            </div>
           {product.discount_percent > 0 && (
             <Tag color="red" className="discount-badge">
               -{product.discount_percent}%
             </Tag>
-          )}
-          {product.stock_quantity === 0 && (
-            <div className="out-of-stock-overlay">
-              <span>Hết hàng</span>
-            </div>
           )}
         </div>
       }
@@ -59,7 +64,6 @@ const ProductCard = ({ product }) => {
           type="primary"
           icon={<ShoppingCartOutlined />}
           onClick={handleAddToCart}
-          disabled={product.stock_quantity === 0}
         >
           Thêm
         </Button>
@@ -84,11 +88,7 @@ const ProductCard = ({ product }) => {
               )}
             </div>
             <div className="product-stock">
-              {product.stock_quantity > 0 ? (
-                <span className="in-stock">Còn {product.stock_quantity} sản phẩm</span>
-              ) : (
-                <span className="out-of-stock">Hết hàng</span>
-              )}
+              <span className="in-stock">Còn hàng</span>
             </div>
           </div>
         }

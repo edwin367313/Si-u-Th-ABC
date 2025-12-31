@@ -1,54 +1,33 @@
 """
-K-Means Customer Segmentation Service
+K-Means Product Classification Service
 """
 
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+from sklearn.feature_extraction.text import TfidfVectorizer
 from typing import Dict, List, Any, Optional
 import sys
 import os
+import joblib
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from utils.database import db
-from utils.helpers import get_customer_segment_label, calculate_rfm_score
 from utils.model_loader import model_loader, MODEL_KMEANS
 
-class KMeansService:
-    """Customer segmentation using K-Means clustering"""
+class ProductClusteringService:
+    """Product classification using K-Means clustering on product names"""
     
     def __init__(self, n_clusters: int = 5):
         self.n_clusters = n_clusters
         self.model = None
-        self.scaler = StandardScaler()
-        self.feature_names = ['recency', 'frequency', 'monetary']
-    
-    def prepare_data(self, customers_data: List[Dict]) -> pd.DataFrame:
-        """Prepare customer data for clustering"""
-        df = pd.DataFrame(customers_data)
-        
-        # Calculate RFM features
-        df['recency'] = df['days_since_last_order']
-        df['frequency'] = df['total_orders']
-        df['monetary'] = df['total_spent']
-        
-        # Calculate RFM score
-        df['rfm_score'] = df.apply(
-            lambda row: calculate_rfm_score(
-                row['recency'],
-                row['frequency'],
-                row['monetary']
-            ),
-            axis=1
-        )
-        
-        return df
+        self.vectorizer = TfidfVectorizer(stop_words='english')
+        self.cluster_labels = {} # Map cluster ID to a human-readable label
     
     def train(self, retrain: bool = False) -> Dict[str, Any]:
-        """Train K-Means model"""
+        """Train K-Means model on product names"""
         # Check if model exists
         if not retrain and model_loader.model_exists(MODEL_KMEANS):
             self.load_model()
@@ -58,159 +37,133 @@ class KMeansService:
                 "model_loaded": True
             }
         
-        # Get training data
-        customers_data = db.get_customers_data()
+        # Get training data (Products)
+        products_data = db.get_products_data()
         
-        if not customers_data:
+        if not products_data:
             return {
                 "success": False,
-                "message": "Không có dữ liệu khách hàng"
+                "message": "Không có dữ liệu sản phẩm"
             }
         
-        # Prepare data
-        df = self.prepare_data(customers_data)
-        X = df[self.feature_names].values
+        df = pd.DataFrame(products_data)
+        # Ensure we have 'name'
+        if 'name' not in df.columns:
+             return {"success": False, "message": "Dữ liệu sản phẩm thiếu trường 'name'"}
+
+        names = df['name'].fillna('').tolist()
         
-        # Normalize features
-        X_scaled = self.scaler.fit_transform(X)
+        # Vectorize names
+        X = self.vectorizer.fit_transform(names)
         
         # Train K-Means
-        self.model = KMeans(n_clusters=self.n_clusters, random_state=42, n_init=10)
-        self.model.fit(X_scaled)
+        n_clusters = min(self.n_clusters, len(names))
+        if n_clusters < 2:
+             n_clusters = 1
+             
+        self.model = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        self.model.fit(X)
         
-        # Save model and scaler
+        # Assign labels to clusters based on majority category in that cluster
+        df['cluster'] = self.model.labels_
+        self.cluster_labels = {}
+        
+        if 'category_name' in df.columns:
+            for i in range(n_clusters):
+                cluster_products = df[df['cluster'] == i]
+                if not cluster_products.empty:
+                    # Find most frequent category
+                    top_cat = cluster_products['category_name'].mode()
+                    if not top_cat.empty:
+                        self.cluster_labels[i] = top_cat[0]
+                    else:
+                        self.cluster_labels[i] = f"Cluster {i}"
+                else:
+                    self.cluster_labels[i] = f"Cluster {i}"
+        else:
+             for i in range(n_clusters):
+                 self.cluster_labels[i] = f"Cluster {i}"
+
+        # Save model
         model_data = {
             'model': self.model,
-            'scaler': self.scaler,
-            'feature_names': self.feature_names
+            'vectorizer': self.vectorizer,
+            'cluster_labels': self.cluster_labels
         }
         model_loader.save_model(model_data, MODEL_KMEANS)
         
-        # Calculate statistics
-        df['cluster'] = self.model.labels_
-        stats = self._calculate_cluster_stats(df)
+        return {
+            "success": True,
+            "message": f"Training thành công với {len(names)} sản phẩm",
+            "n_clusters": n_clusters,
+            "inertia": float(self.model.inertia_)
+        }
+
+    def predict(self, product_name: str) -> Dict[str, Any]:
+        """Predict category for a product name"""
+        if not self.model:
+            if not self.load_model():
+                return {"success": False, "message": "Model chưa được training"}
+        
+        # Vectorize
+        X = self.vectorizer.transform([product_name])
+        
+        # Predict cluster
+        cluster_id = int(self.model.predict(X)[0])
+        suggested_category = self.cluster_labels.get(cluster_id, f"Cluster {cluster_id}")
         
         return {
             "success": True,
-            "message": f"Training thành công với {len(customers_data)} khách hàng",
-            "n_clusters": self.n_clusters,
-            "n_samples": len(customers_data),
-            "inertia": float(self.model.inertia_),
-            "statistics": stats
+            "product_name": product_name,
+            "cluster_id": cluster_id,
+            "suggested_category": suggested_category
         }
-    
-    def load_model(self) -> bool:
-        """Load trained model"""
-        model_data = model_loader.load_model(MODEL_KMEANS)
+
+    def get_all_clusters(self) -> Dict[str, Any]:
+        """Get all product clusters"""
+        if not self.model:
+            if not self.load_model():
+                return {"success": False, "message": "Model chưa được training"}
         
+        products_data = db.get_products_data()
+        if not products_data:
+            return {"success": False, "message": "Không có dữ liệu sản phẩm"}
+            
+        df = pd.DataFrame(products_data)
+        if 'name' not in df.columns:
+             return {"success": False, "message": "Dữ liệu sản phẩm thiếu trường 'name'"}
+
+        names = df['name'].fillna('').tolist()
+        X = self.vectorizer.transform(names)
+        clusters = self.model.predict(X)
+        
+        df['cluster'] = clusters
+        df['suggested_category'] = df['cluster'].map(lambda x: self.cluster_labels.get(x, f"Cluster {x}"))
+        
+        # Group by cluster
+        result = {}
+        for cluster_id in range(self.n_clusters):
+            cluster_products = df[df['cluster'] == cluster_id]
+            result[cluster_id] = {
+                "label": self.cluster_labels.get(cluster_id, f"Cluster {cluster_id}"),
+                "count": len(cluster_products),
+                "products": cluster_products[['id', 'name', 'price']].to_dict('records')
+            }
+            
+        return {
+            "success": True,
+            "clusters": result
+        }
+
+    def load_model(self) -> bool:
+        """Load model from disk"""
+        model_data = model_loader.load_model(MODEL_KMEANS)
         if model_data:
             self.model = model_data['model']
-            self.scaler = model_data['scaler']
-            self.feature_names = model_data['feature_names']
+            self.vectorizer = model_data['vectorizer']
+            self.cluster_labels = model_data.get('cluster_labels', {})
             return True
         return False
-    
-    def predict(self, customer_data: Dict) -> Dict[str, Any]:
-        """Predict customer segment"""
-        if not self.model:
-            if not self.load_model():
-                return {
-                    "success": False,
-                    "message": "Model chưa được training"
-                }
-        
-        # Prepare features
-        features = np.array([[
-            customer_data.get('recency', 0),
-            customer_data.get('frequency', 0),
-            customer_data.get('monetary', 0)
-        ]])
-        
-        # Scale and predict
-        features_scaled = self.scaler.transform(features)
-        cluster = int(self.model.predict(features_scaled)[0])
-        
-        return {
-            "success": True,
-            "cluster": cluster,
-            "segment": get_customer_segment_label(cluster),
-            "rfm_score": calculate_rfm_score(
-                customer_data.get('recency', 0),
-                customer_data.get('frequency', 0),
-                customer_data.get('monetary', 0)
-            )
-        }
-    
-    def segment_all_customers(self) -> Dict[str, Any]:
-        """Segment all customers"""
-        if not self.model:
-            if not self.load_model():
-                return {
-                    "success": False,
-                    "message": "Model chưa được training"
-                }
-        
-        # Get all customers
-        customers_data = db.get_customers_data()
-        
-        if not customers_data:
-            return {
-                "success": False,
-                "message": "Không có dữ liệu khách hàng"
-            }
-        
-        # Prepare and predict
-        df = self.prepare_data(customers_data)
-        X = df[self.feature_names].values
-        X_scaled = self.scaler.transform(X)
-        
-        clusters = self.model.predict(X_scaled)
-        df['cluster'] = clusters
-        df['segment'] = df['cluster'].apply(get_customer_segment_label)
-        
-        # Calculate statistics
-        stats = self._calculate_cluster_stats(df)
-        
-        # Prepare results
-        segments = []
-        for _, row in df.iterrows():
-            segments.append({
-                "user_id": int(row['user_id']),
-                "cluster": int(row['cluster']),
-                "segment": row['segment'],
-                "rfm_score": int(row['rfm_score']),
-                "recency": int(row['recency']),
-                "frequency": int(row['frequency']),
-                "monetary": float(row['monetary'])
-            })
-        
-        return {
-            "success": True,
-            "total_customers": len(segments),
-            "segments": segments,
-            "statistics": stats
-        }
-    
-    def _calculate_cluster_stats(self, df: pd.DataFrame) -> List[Dict]:
-        """Calculate statistics for each cluster"""
-        stats = []
-        
-        for cluster in range(self.n_clusters):
-            cluster_df = df[df['cluster'] == cluster]
-            
-            if len(cluster_df) > 0:
-                stats.append({
-                    "cluster": int(cluster),
-                    "segment": get_customer_segment_label(cluster),
-                    "count": len(cluster_df),
-                    "percentage": round(len(cluster_df) / len(df) * 100, 2),
-                    "avg_recency": round(cluster_df['recency'].mean(), 2),
-                    "avg_frequency": round(cluster_df['frequency'].mean(), 2),
-                    "avg_monetary": round(cluster_df['monetary'].mean(), 2),
-                    "avg_rfm_score": round(cluster_df['rfm_score'].mean(), 2)
-                })
-        
-        return stats
 
 # Singleton instance
-kmeans_service = KMeansService()
+kmeans_service = ProductClusteringService()

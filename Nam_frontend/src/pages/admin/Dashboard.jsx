@@ -1,5 +1,5 @@
-import React from 'react';
-import { Card, Row, Col, Statistic, Button, Typography, Space } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Row, Col, Statistic, Button, Typography, Space, Spin } from 'antd';
 import {
   ShoppingOutlined,
   DollarOutlined,
@@ -11,11 +11,36 @@ import {
   BellOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import revenueService from '../../services/revenueService';
 
 const { Title } = Typography;
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    yearlyRevenue: 0,
+    totalOrders: 0,
+    totalProducts: 0,
+    totalUsers: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const res = await revenueService.getOverview();
+      if (res.success) {
+        setStats(res.data);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const menuItems = [
     {
@@ -57,49 +82,52 @@ const Dashboard = () => {
       <Title level={2}>Trang quản trị</Title>
       
       {/* Statistics Section */}
-      <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card hoverable>
-            <Statistic
-              title="Tổng doanh thu"
-              value={112893000}
-              suffix="đ"
-              prefix={<DollarOutlined />}
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card hoverable>
-            <Statistic
-              title="Đơn hàng"
-              value={128}
-              prefix={<ShoppingCartOutlined />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card hoverable>
-            <Statistic
-              title="Sản phẩm"
-              value={234}
-              prefix={<ShoppingOutlined />}
-              valueStyle={{ color: '#cf1322' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card hoverable>
-            <Statistic
-              title="Khách hàng"
-              value={456}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: '#722ed1' }}
-            />
-          </Card>
-        </Col>
-      </Row>
+      <Spin spinning={loading}>
+        <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
+          <Col xs={24} sm={12} md={6}>
+            <Card hoverable>
+              <Statistic
+                title="Doanh thu năm nay"
+                value={stats.yearlyRevenue}
+                suffix="đ"
+                prefix={<DollarOutlined />}
+                valueStyle={{ color: '#3f8600' }}
+                formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card hoverable>
+              <Statistic
+                title="Đơn hàng"
+                value={stats.totalOrders}
+                prefix={<ShoppingCartOutlined />}
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card hoverable>
+              <Statistic
+                title="Sản phẩm"
+                value={stats.totalProducts}
+                prefix={<ShoppingOutlined />}
+                valueStyle={{ color: '#cf1322' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card hoverable>
+              <Statistic
+                title="Khách hàng"
+                value={stats.totalUsers}
+                prefix={<UserOutlined />}
+                valueStyle={{ color: '#722ed1' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+      </Spin>
 
       {/* Quick Actions Section */}
       <Title level={3}>Chức năng quản lý</Title>

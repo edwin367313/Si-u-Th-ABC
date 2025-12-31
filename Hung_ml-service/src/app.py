@@ -11,8 +11,8 @@ import os
 from dotenv import load_dotenv
 
 # Import API routers
-from api import customer_segmentation, revenue_prediction, product_association
-from api import product_classifier, image_classification
+from src.api import customer_segmentation, revenue_prediction, product_association
+from src.api import product_classifier, image_classification
 
 # Load environment variables
 load_dotenv()

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { List, Card, Tag, Button, Typography, Space, message, Badge } from 'antd';
 import { BellOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../utils/api';
 
 const { Title, Text } = Typography;
 
@@ -15,17 +15,14 @@ const NotificationsPage = () => {
   const fetchNotifications = async (page = 1) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:5000/api/notifications/admin?page=${page}&limit=10`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/notifications/admin?page=${page}&limit=10`);
       
-      if (response.data.success) {
-        setNotifications(response.data.data.notifications);
+      if (response.success) {
+        setNotifications(response.data.notifications);
         setPagination({
           current: page,
           pageSize: 10,
-          total: response.data.data.pagination.total
+          total: response.data.pagination.total
         });
       }
     } catch (error) {
@@ -42,10 +39,7 @@ const NotificationsPage = () => {
 
   const handleMarkAsRead = async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`http://localhost:5000/api/notifications/${id}/read`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(`/notifications/${id}/read`);
       
       // Update local state
       setNotifications(prev => prev.map(n => 
@@ -58,15 +52,22 @@ const NotificationsPage = () => {
 
   const handleMarkAllRead = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`http://localhost:5000/api/notifications/read-all`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(`/notifications/read-all`);
       
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       message.success('Đã đánh dấu tất cả là đã đọc');
     } catch (error) {
       message.error('Có lỗi xảy ra');
+    }
+  };
+
+  const handleUpdateStatus = async (orderId, status) => {
+    try {
+      await api.put(`/orders/${orderId}/status`, { status });
+      message.success('Cập nhật trạng thái đơn hàng thành công');
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      message.error('Không thể cập nhật trạng thái đơn hàng');
     }
   };
 
@@ -97,6 +98,30 @@ const NotificationsPage = () => {
                 <Button type="link" onClick={() => handleViewOrder(item.reference_id, item.id)}>
                   Xem chi tiết
                 </Button>,
+                item.type === 'order' && (
+                  <Space>
+                    <Button 
+                      type="primary" 
+                      size="small" 
+                      style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                      onClick={() => handleUpdateStatus(item.reference_id, 'DELIVERED')}
+                    >
+                      Đã thanh toán
+                    </Button>
+                    <Button 
+                      type="primary" 
+                      danger 
+                      size="small" 
+                      onClick={() => {
+                        if (window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
+                          handleUpdateStatus(item.reference_id, 'CANCELLED');
+                        }
+                      }}
+                    >
+                      Huỷ
+                    </Button>
+                  </Space>
+                ),
                 !item.is_read && (
                   <Button type="text" size="small" onClick={() => handleMarkAsRead(item.id)}>
                     Đã đọc

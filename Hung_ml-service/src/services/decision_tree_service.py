@@ -4,7 +4,7 @@ Decision Tree Revenue Prediction Service
 
 import numpy as np
 import pandas as pd
-from sklearn.tree import DecisionTreeRegressor
+from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from typing import Dict, List, Any
@@ -15,8 +15,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from utils.database import db
-from utils.helpers import calculate_mae, calculate_rmse, get_date_features
-from utils.model_loader import model_loader, MODEL_DECISION_TREE
+from utils.helpers import calculate_mae, calculate_rmse, get_date_features, calculate_rfm_score, get_customer_segment_label
+from utils.model_loader import model_loader, MODEL_DECISION_TREE, MODEL_CUSTOMER_CLASSIFIER
 
 class DecisionTreeService:
     """Revenue prediction using Decision Tree"""
@@ -133,6 +133,13 @@ class DecisionTreeService:
                     "message": "Model chưa được training"
                 }
         
+        # Ensure model is loaded after load_model call
+        if self.model is None:
+            return {
+                "success": False,
+                "message": "Model chưa được training"
+            }
+        
         # Get historical averages (mock for now)
         avg_order_7d = 150000
         avg_order_30d = 145000
@@ -197,5 +204,130 @@ class DecisionTreeService:
             "daily_forecasts": forecasts
         }
 
-# Singleton instance
+class CustomerClassificationService:
+    """Customer classification using Decision Tree"""
+    
+    def __init__(self):
+        self.model = None
+        self.feature_names = ['recency', 'frequency', 'monetary']
+        
+    def prepare_data(self, customers_data: List[Dict]) -> pd.DataFrame:
+        """Prepare customer data"""
+        df = pd.DataFrame(customers_data)
+        
+        # Calculate RFM features
+        df['recency'] = df['days_since_last_order']
+        df['frequency'] = df['total_orders']
+        df['monetary'] = df['total_spent']
+        
+        # Calculate RFM score and label (Target)
+        df['rfm_score'] = df.apply(
+            lambda row: calculate_rfm_score(
+                row['recency'],
+                row['frequency'],
+                row['monetary']
+            ),
+            axis=1
+        )
+        
+        # Use heuristic label as target for Decision Tree
+        df['label'] = df['rfm_score'].apply(get_customer_segment_label)
+        
+        return df
+
+    def train(self, retrain: bool = False) -> Dict[str, Any]:
+        """Train Decision Tree Classifier"""
+        if not retrain and model_loader.model_exists(MODEL_CUSTOMER_CLASSIFIER):
+            self.load_model()
+            return {"success": True, "message": "Model đã tồn tại, sử dụng model có sẵn"}
+            
+        customers_data = db.get_customers_data()
+        if not customers_data:
+            return {"success": False, "message": "Không có dữ liệu khách hàng"}
+            
+        df = self.prepare_data(customers_data)
+        X = df[self.feature_names].values
+        y = df['label'].tolist()
+        
+        # Train
+        self.model = DecisionTreeClassifier(max_depth=5, random_state=42)
+        self.model.fit(X, y)
+        
+        # Save
+        model_data = {
+            'model': self.model,
+            'feature_names': self.feature_names
+        }
+        model_loader.save_model(model_data, MODEL_CUSTOMER_CLASSIFIER)
+        
+        return {
+            "success": True, 
+            "message": f"Training thành công với {len(customers_data)} khách hàng",
+            "classes": list(self.model.classes_)
+        }
+
+    def predict(self, recency, frequency, monetary) -> str:
+        """Predict customer segment"""
+        if not self.model:
+            if not self.load_model():
+                return "Unknown (Model not loaded)"
+        
+        # Ensure model is loaded
+        if self.model is None:
+            return "Unknown (Model not loaded)"
+        
+        X = np.array([[recency, frequency, monetary]])
+        return self.model.predict(X)[0]
+
+    def segment_all_customers(self) -> Dict[str, Any]:
+        """Segment all customers"""
+        if not self.model:
+            if not self.load_model():
+                return {"success": False, "message": "Model chưa được training"}
+        
+        # Ensure model is loaded after load_model call
+        if self.model is None:
+            return {"success": False, "message": "Model chưa được training"}
+        
+        customers_data = db.get_customers_data()
+        if not customers_data:
+            return {"success": False, "message": "Không có dữ liệu khách hàng"}
+            
+        df = self.prepare_data(customers_data)
+        X = df[self.feature_names].values
+        
+        # Predict
+        df['predicted_segment'] = self.model.predict(X)
+        
+        # Stats
+        stats = df['predicted_segment'].value_counts().to_dict()
+        
+        segments = []
+        for _, row in df.iterrows():
+            segments.append({
+                "user_id": int(row['user_id']),
+                "segment": row['predicted_segment'],
+                "rfm_score": int(row['rfm_score']),
+                "recency": int(row['recency']),
+                "frequency": int(row['frequency']),
+                "monetary": float(row['monetary'])
+            })
+            
+        return {
+            "success": True,
+            "total_customers": len(segments),
+            "segments": segments,
+            "statistics": stats
+        }
+
+    def load_model(self) -> bool:
+        """Load model"""
+        data = model_loader.load_model(MODEL_CUSTOMER_CLASSIFIER)
+        if data:
+            self.model = data['model']
+            return True
+        return False
+
+# Singleton instances
 decision_tree_service = DecisionTreeService()
+customer_classification_service = CustomerClassificationService()

@@ -25,7 +25,8 @@ export const PAYMENT_METHODS = {
   MOMO: 'momo',
   ZALOPAY: 'zalopay',
   PAYPAL: 'paypal',
-  COD: 'cod'
+  COD: 'cod',
+  BANK_TRANSFER: 'bank_transfer'
 };
 
 // Order Status

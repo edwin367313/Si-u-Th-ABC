@@ -81,8 +81,9 @@ class ModelLoader:
 model_loader = ModelLoader()
 
 # Predefined model names
-MODEL_KMEANS = "customer_segmentation_kmeans"
+MODEL_KMEANS = "product_clustering_kmeans" # Changed from customer_segmentation_kmeans
 MODEL_DECISION_TREE = "revenue_prediction_dt"
 MODEL_APRIORI = "product_association_apriori"
 MODEL_PRODUCT_NLP = "product_classifier_nlp"
 MODEL_IMAGE_CNN = "image_classification_cnn"
+MODEL_CUSTOMER_CLASSIFIER = "customer_classification_dt"

@@ -1,52 +1,61 @@
-const Order = require('../models/Order');
-const OrderItem = require('../models/OrderItem');
-const Product = require('../models/Product');
-const Category = require('../models/Category');
-// const { Op } = require('sequelize');
-// const { sequelize } = require('../config/database');
+const { query } = require('../config/database');
 
 /**
  * Lấy tổng quan doanh thu
  */
 const getRevenueOverview = async () => {
-  const today = new Date();
-  const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  // Daily Revenue
+  const dailyResult = await query(`
+    SELECT SUM(total_amount) as total 
+    FROM Orders 
+    WHERE status = 'DELIVERED' 
+    AND CAST(created_at AS DATE) = CAST(GETDATE() AS DATE)
+  `);
 
-  const dailyRevenue = await Order.sum('total', {
-    where: {
-      orderStatus: 'delivered',
-      paymentStatus: 'paid',
-      createdAt: { [Op.gte]: startOfDay }
-    }
-  }) || 0;
+  // Monthly Revenue
+  const monthlyResult = await query(`
+    SELECT SUM(total_amount) as total 
+    FROM Orders 
+    WHERE status = 'DELIVERED' 
+    AND MONTH(created_at) = MONTH(GETDATE()) 
+    AND YEAR(created_at) = YEAR(GETDATE())
+  `);
 
-  const monthlyRevenue = await Order.sum('total', {
-    where: {
-      orderStatus: 'delivered',
-      paymentStatus: 'paid',
-      createdAt: { [Op.gte]: startOfMonth }
-    }
-  }) || 0;
+  // Yearly Revenue
+  const yearlyResult = await query(`
+    SELECT SUM(total_amount) as total 
+    FROM Orders 
+    WHERE status = 'DELIVERED' 
+    AND YEAR(created_at) = YEAR(GETDATE())
+  `);
 
-  const yearlyRevenue = await Order.sum('total', {
-    where: {
-      orderStatus: 'delivered',
-      paymentStatus: 'paid',
-      createdAt: { [Op.gte]: startOfYear }
-    }
-  }) || 0;
+  // Total Orders
+  const ordersResult = await query(`
+    SELECT COUNT(*) as total 
+    FROM Orders 
+  `);
 
-  const totalOrders = await Order.count({
-    where: { orderStatus: 'delivered' }
-  });
+  // Total Products
+  const productsResult = await query(`
+    SELECT COUNT(*) as total 
+    FROM Products 
+    WHERE status = 'active'
+  `);
+
+  // Total Users
+  const usersResult = await query(`
+    SELECT COUNT(*) as total 
+    FROM Users 
+    WHERE role = 'customer'
+  `);
 
   return {
-    dailyRevenue,
-    monthlyRevenue,
-    yearlyRevenue,
-    totalOrders
+    dailyRevenue: dailyResult[0]?.total || 0,
+    monthlyRevenue: monthlyResult[0]?.total || 0,
+    yearlyRevenue: yearlyResult[0]?.total || 0,
+    totalOrders: ordersResult[0]?.total || 0,
+    totalProducts: productsResult[0]?.total || 0,
+    totalUsers: usersResult[0]?.total || 0
   };
 };
 
@@ -54,28 +63,18 @@ const getRevenueOverview = async () => {
  * Lấy doanh thu theo khoảng thời gian
  */
 const getRevenueByPeriod = async (startDate, endDate) => {
-  const revenue = await Order.sum('total', {
-    where: {
-      orderStatus: 'delivered',
-      paymentStatus: 'paid',
-      createdAt: {
-        [Op.between]: [new Date(startDate), new Date(endDate)]
-      }
-    }
-  }) || 0;
-
-  const orders = await Order.count({
-    where: {
-      orderStatus: 'delivered',
-      createdAt: {
-        [Op.between]: [new Date(startDate), new Date(endDate)]
-      }
-    }
-  });
+  const result = await query(`
+    SELECT 
+      SUM(total_amount) as revenue,
+      COUNT(*) as orders
+    FROM Orders
+    WHERE status = 'DELIVERED'
+    AND created_at BETWEEN @startDate AND @endDate
+  `, { startDate, endDate });
 
   return {
-    revenue,
-    orders,
+    revenue: result[0]?.revenue || 0,
+    orders: result[0]?.orders || 0,
     startDate,
     endDate
   };
@@ -85,79 +84,80 @@ const getRevenueByPeriod = async (startDate, endDate) => {
  * Lấy doanh thu theo tháng
  */
 const getMonthlyRevenue = async (year) => {
-  const results = await sequelize.query(`
+  const result = await query(`
     SELECT 
-      MONTH(createdAt) as month,
-      SUM(total) as revenue,
+      MONTH(created_at) as month,
+      SUM(total_amount) as revenue,
       COUNT(*) as orders
     FROM Orders
-    WHERE YEAR(createdAt) = :year
-      AND orderStatus = 'delivered'
-      AND paymentStatus = 'paid'
-    GROUP BY MONTH(createdAt)
+    WHERE YEAR(created_at) = @year
+      AND status = 'DELIVERED'
+    GROUP BY MONTH(created_at)
     ORDER BY month
-  `, {
-    replacements: { year },
-    type: sequelize.QueryTypes.SELECT
-  });
-
-  return results;
+  `, { year });
+  
+  return result;
 };
 
 /**
- * Lấy sản phẩm bán chạy nhất
+ * Lấy top sản phẩm bán chạy
  */
-const getTopProducts = async (limit = 10) => {
-  const results = await OrderItem.findAll({
-    attributes: [
-      'productId',
-      [sequelize.fn('SUM', sequelize.col('quantity')), 'totalSold'],
-      [sequelize.fn('SUM', sequelize.literal('quantity * price')), 'totalRevenue']
-    ],
-    include: [{
-      model: Product,
-      as: 'product',
-      attributes: ['id', 'name', 'price', 'images']
-    }],
-    group: ['productId'],
-    order: [[sequelize.literal('totalSold'), 'DESC']],
-    limit
-  });
-
-  return results;
+const getTopProducts = async (limit = 5) => {
+  const result = await query(`
+    SELECT TOP (@limit)
+      p.id,
+      p.name,
+      SUM(oi.quantity) as sold_quantity,
+      SUM(oi.price * oi.quantity) as revenue
+    FROM OrderItems oi
+    JOIN Orders o ON oi.order_id = o.id
+    JOIN Products p ON oi.product_id = p.id
+    WHERE o.status = 'DELIVERED'
+    GROUP BY p.id, p.name
+    ORDER BY sold_quantity DESC
+  `, { limit: parseInt(limit) });
+  
+  return result;
 };
 
 /**
  * Lấy doanh thu theo danh mục
  */
 const getRevenueByCategory = async () => {
-  const results = await sequelize.query(`
+  const result = await query(`
     SELECT 
-      c.id,
-      c.name,
-      SUM(oi.quantity * oi.price) as revenue,
-      SUM(oi.quantity) as totalSold
-    FROM Categories c
-    LEFT JOIN Products p ON c.id = p.categoryId
-    LEFT JOIN OrderItems oi ON p.id = oi.productId
-    LEFT JOIN Orders o ON oi.orderId = o.id
-    WHERE o.orderStatus = 'delivered' AND o.paymentStatus = 'paid'
-    GROUP BY c.id, c.name
+      c.name as category,
+      SUM(oi.price * oi.quantity) as revenue
+    FROM OrderItems oi
+    JOIN Orders o ON oi.order_id = o.id
+    JOIN Products p ON oi.product_id = p.id
+    JOIN Categories c ON p.category_id = c.id
+    WHERE o.status = 'DELIVERED'
+    GROUP BY c.name
     ORDER BY revenue DESC
-  `, {
-    type: sequelize.QueryTypes.SELECT
-  });
-
-  return results;
+  `);
+  
+  return result;
 };
 
 /**
  * Export báo cáo doanh thu
  */
 const exportRevenueReport = async (startDate, endDate) => {
-  // TODO: Implement Excel/PDF export
-  const data = await getRevenueByPeriod(startDate, endDate);
-  return data;
+  const result = await query(`
+    SELECT 
+      o.id as 'Mã đơn',
+      o.created_at as 'Ngày tạo',
+      o.full_name as 'Khách hàng',
+      o.total_amount as 'Tổng tiền',
+      o.payment_method as 'Phương thức thanh toán'
+    FROM Orders o
+    WHERE o.status = 'DELIVERED'
+    AND o.created_at BETWEEN @startDate AND @endDate
+    ORDER BY o.created_at DESC
+  `, { startDate, endDate });
+  
+  return result;
 };
 
 module.exports = {
